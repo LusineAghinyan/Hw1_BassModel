@@ -1,0 +1,150 @@
+---
+title: "Bass Model HW"
+author: "Lusine Aghinyan "
+date: "2024-02-28"
+output: pdf_document
+---
+
+Innovation - Apple Watch Ultra 2
+Look-alike innovation - Garmin Fenix 6
+
+I have picked a device from Garmin.I have made my decision based on their strong position in the sports and outdoor areas, which closely correspond with the target demographic of the Apple Watch Ultra 2.
+The Garmin Fenix 6, was launched in 2019.Garmin specializes in high-endurance sports watches that appeal to a comparable target group interested in outdoor activities and sophisticated fitness tracking.The Fenix 6 is a direct rival to the Ultra 2's focus on durability, outdoor capabilities, and health monitoring because of its robust build, extended battery life, precise GPS capability, and numerous data metrics for various activities. This comparison highlights variations in brand loyalty, technological adoption, and feature prioritization and enables an in-depth investigation of market preferences within the niche of customers who want more from their devices than simple fitness monitoring.
+
+```{r}
+library(readxl)
+library(tidyverse)
+library(nls.multstart)
+library(broom)
+library(dplyr)
+libs<-c('ggplot2','ggpubr','knitr','diffusion')
+load_libraries<-function(libs){
+  new_libs <- libs[!(libs %in% installed.packages()[,"Package"])]
+  if(length(new_libs)>0) {install.packages(new_libs)}
+  lapply(libs, library, character.only = TRUE)
+  }
+load_libraries(libs)
+```
+
+
+```{r}
+# Loading the Excel file
+sales_data <- read_excel("/Users/annamovsisyan/Desktop/sales_data2.xlsx")
+```
+ Why I have chosen the given dataset 
+For several reasons, the dataset "Garmin Quarterly Revenue by Segment 2017-2023" has been chosen to be used in the Bass Model analysis of the Garmin Fenix 6's diffusion.
+The "Outdoor" portion of the dataset, which is where the Fenix series is classified, offers a segmented perspective of Garmin's revenue. This specificity is important because it provides a concentrated perspective on the financial performance of items that are directly comparable to the Fenix 6, and it closely matches with the product's market and consumer base. We are able to get insights that are more relevant and indicative of the possible market behaviour for comparable inventions by examining the patterns in this specific market niche.
+Moreover,the dataset comprises many years' worth of financial performance, from 2017 to 2023. This makes it feasible to observe longer-term trends, such as the market's development, maturity, and potential saturation for smartwatches geared towards outdoor activities. Applying the Bass Model, which attempts to capture the whole diffusion process from product introduction to acceptance by the late majority, requires the data to include many stages of the product lifetime.
+The selected dataset offers comprehensive, pertinent, and well divided financial data over an extended duration, which is essential for building a trustworthy and perceptive diffusion model for a high-performance sports watch such as the Garmin Fenix 6.
+
+```{r}
+# I want to check if there is any Na
+any(is.na(sales_data))
+any(is.infinite(sales_data$Outdoor))
+```
+```{r}
+# Extracting year from the 'Time' column and create a new 'Year' column
+sales_data$Year <- sub(".* '", "", sales_data$Time)
+```
+
+```{r}
+# Suming the Outdoor sales for each year
+#I have chosen Outdoor category, as Garmin Fenix 6 fits into Outdoor Category 
+outdoor_sums <- sales_data %>%
+  group_by(Year) %>%
+  summarise(Outdoor_Sum = sum(Outdoor))
+
+print(outdoor_sums)
+```
+
+```{r}
+
+library(diffusion)
+library(tidyverse)
+# Ensuring the sales data is numeric
+outdoor_sales = as.numeric(as.character(outdoor_sums$Outdoor_Sum))
+
+# Applying the diffusion model
+diff_m_outdoor = diffusion(outdoor_sales)
+
+# Extracting parameters for our model
+p_outdoor = round(diff_m_outdoor$w, 4)[1]
+q_outdoor = round(diff_m_outdoor$w, 4)[2]
+m_outdoor = round(diff_m_outdoor$w, 4)[3]
+
+# Printing the model parameters
+diff_m_outdoor
+
+
+#This is the Method 2 of parameter estimation
+```
+A somewhat small but substantial potential for people to embrace the product on their own, independent of the influence of those who have previously adopted it, is shown by the coefficient of innovation, p=0.0559. This suggests that, due to perceived needs or personal desire, about 5.59% of the entire potential market is motivated to embrace the invention. The coefficient of imitation, q=0.4778, is significantly higher, suggesting that social variables, such as social factors, impact the decision of roughly 47.78% of the potential market to adopt the product. This implies that the main factors influencing adoption are hearing about and witnessing other people using the product. The total number of units anticipated to be sold throughout the course of the product's lifespan before the market becomes saturated is shown by the market potential, m=8424.2769. The sigma number, 262.0606, represents the residual standard error of the model and gives an indication of how much actual data deviate from sales estimates.
+
+```{r}
+# Define t as a sequence from 1 to the number of rows in outdoor_sums
+t <- 1:nrow(outdoor_sums)
+
+# Fit the Bass model using nls()
+bass_m <- nls(Outdoor_Sum ~ m * (((p + q)^2 / p) * exp(-(p + q) * t)) / (1 + (q / p) * exp(-(p + q) * t))^2,
+              data = outdoor_sums,
+              start = list(m = max(outdoor_sums$Outdoor_Sum), p = 0.03, q = 0.4))
+
+# Summary of the model to see the parameter estimates
+summary(bass_m)
+
+# This is the Method 1 of parameter estimation
+```
+
+Estimates for the parameters controlling the Outdoor category product's diffusion are provided by the fitted Bass model. With a standard error of 1,634 units and an estimated market potential of 7,981 units, the estimate is very confident in its estimation of the unexplored market size, and it is statistically significant at the 0.01 level. With a standard error of 0.02024 and an estimated coefficient of innovation p of 0.03846 (or around 3.85%), the coefficient is not statistically significant at conventional levels (p-value = 0.13025), indicating ambiguity over the precise impact of innovators on adoption rates. With a standard error of 0.2129 and an estimated coefficient of imitation q of 0.5634 (or roughly 56.34%), the result is on the edge of statistical significance at the 0.05 level (p-value = 0.05718), suggesting that the imitation effect—that is, the impact of early adopters on subsequent adopters—is a potent force behind product diffusion, even though it is only marginally significant. With a final convergence tolerance of around 5.133e-06, the model needed 17 iterations to converge and met the conditions of the procedure, suggesting a precise fit. Although the precise rate of innovation-driven adoption is less evident from this research, these results highlight the significance of peer influence in the adoption process for items in the Outdoor category.
+
+
+```{r}
+
+bass.f <- function(t,p,q){
+  ((p+q)^2/p)*exp(-(p+q)*t)/
+    (1+(q/p)*exp(-(p+q)*t))^2
+  }
+
+bass.F <- function(t,p,q){
+  (1-exp(-(p+q)*t))/
+    (1+(q/p)*exp(-(p+q)*t))
+  }
+p <- 0.0559
+q <- 0.4778
+m <- 8424.2769  # This is the market potential
+
+
+# Now, using the defined parameters in function calls
+predict <- bass.f(t = t, p = p, q = q) * m
+predicted_df <- data.frame(t = t, pred = predict)
+
+predict1 <- bass.F(t = t, p = p, q = q) * m
+predicted1_df <- data.frame(t = t, pred = predict1)
+```
+
+```{r}
+p1 <- ggplot(predicted_df, aes(x = t, y = pred)) + 
+  geom_line() + 
+  labs(title = "Number of Adoptions at Time t", y = "f(t)", x = "Time (t)")
+
+p2 <- ggplot(predicted1_df, aes(x = t, y = pred)) + 
+  geom_line() + 
+  labs(title = "Cumulative Adoptions", y = "F(t)", x = "Time (t)")
+
+ggarrange(p2, p1, ncol = 2, nrow = 1)
+
+
+```
+
+
+```{r}
+predicted_peak_time <- log(q/p) / (p+q)
+
+# Find the index of the actual peak sales in outdoor_sums$Outdoor_Sum
+actual_peak_time <- which.max(outdoor_sums$Outdoor_Sum)
+
+# Create a dataframe to compare the predicted and actual peak times
+comparison_df <- data.frame(Predicted = predicted_peak_time, Actual = actual_peak_time)
+
+comparison_df
+```
